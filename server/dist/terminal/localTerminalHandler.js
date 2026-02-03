@@ -104,13 +104,18 @@ class LocalTerminalHandler {
             logger_1.logger.warn('Invalid terminal_close message: missing sessionId');
             return;
         }
+        let success = false;
         const connection = localTerminalManager_1.localTerminalManager.getConnection(clientId);
-        if (!connection) {
-            logger_1.logger.warn(`No terminal connection for client ${clientId}`);
-            return;
+        if (connection) {
+            // kill=true will also kill the zellij session; default is just detach
+            success = connection.closeTerminal(sessionId, kill === true);
         }
-        // kill=true will also kill the zellij session; default is just detach
-        const success = connection.closeTerminal(sessionId, kill === true);
+        else if (kill) {
+            // No connection found, but user wants to kill - try direct kill by sessionId
+            // This handles the case where terminal was created via /terminal direct WebSocket
+            success = localTerminalManager_1.ZellijTerminalConnection.killSessionById(sessionId);
+            logger_1.logger.info(`Direct kill for session ${sessionId}: ${success}`);
+        }
         this.sendFn(ws, {
             type: 'terminal_close_response',
             data: { success, sessionId },

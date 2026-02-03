@@ -30,15 +30,23 @@ export class WebSocketServer {
 
     // Handle HTTP upgrade requests
     server.on('upgrade', (request: IncomingMessage, socket, head) => {
+      const clientIp = request.socket.remoteAddress;
+      const clientPort = request.socket.remotePort;
+      logger.info(`[WS Upgrade] Request from ${clientIp}:${clientPort}, URL: ${request.url}`);
+
       // Route /terminal to terminal direct WebSocket handler
       if (terminalWebSocketHandler.shouldHandle(request)) {
+        logger.info(`[WS Upgrade] Routing to terminal handler`);
         const terminalWss = new WebSocket.Server({ noServer: true });
         terminalWss.handleUpgrade(request, socket, head, (ws) => {
+          logger.info(`[WS Upgrade] Terminal upgrade complete`);
           terminalWebSocketHandler.handleConnection(ws, request);
         });
       } else {
         // Default: main WebSocket for JSON-RPC style messages
+        logger.info(`[WS Upgrade] Routing to main handler`);
         this.wss.handleUpgrade(request, socket, head, (ws) => {
+          logger.info(`[WS Upgrade] Main upgrade complete`);
           this.wss.emit('connection', ws, request);
         });
       }
@@ -46,39 +54,41 @@ export class WebSocketServer {
 
     this.setupWebSocket();
 
-    server.listen(CONFIG.port, () => {
-      logger.info(`WebSocket server running on port ${CONFIG.port}`);
-      logger.info(`  - Main API: ws://host:${CONFIG.port}/`);
-      logger.info(`  - Terminal direct: ws://host:${CONFIG.port}/terminal`);
+    server.listen(CONFIG.port, CONFIG.host, () => {
+      logger.info(`WebSocket server running on ${CONFIG.host}:${CONFIG.port}`);
+      logger.info(`  - Main API: ws://${CONFIG.host}:${CONFIG.port}/`);
+      logger.info(`  - Terminal direct: ws://${CONFIG.host}:${CONFIG.port}/terminal`);
     });
   }
 
   private setupWebSocket() {
-    this.wss.on('connection', (ws: WebSocket) => {
-      logger.info('New client connection attempt');
+    this.wss.on('connection', (ws: WebSocket, request: any) => {
+      const clientIp = request?.socket?.remoteAddress || 'unknown';
+      logger.info(`[WS Connection] New client from ${clientIp}`);
 
       ws.on('message', async (data) => {
         try {
           const message: ClientMessage = JSON.parse(data.toString());
+          logger.info(`[WS Message] Type: ${message.type}, from ${clientIp}`);
           await this.handleMessage(ws, message);
         } catch (error) {
-          logger.error('Error parsing message:', error);
+          logger.error(`[WS Message] Parse error from ${clientIp}:`, error);
           this.sendError(ws, 'Invalid message format');
         }
       });
 
-      ws.on('close', () => {
+      ws.on('close', (code, reason) => {
         const clientId = this.getClientId(ws);
+        logger.info(`[WS Close] Client ${clientId || 'unknown'} closed with code ${code}, reason: ${reason?.toString() || 'none'}`);
         if (clientId) {
           this.terminalHandler.cleanup(clientId);
           unwatchSession(clientId);
           this.clients.delete(clientId);
-          logger.info(`Client ${clientId} disconnected`);
         }
       });
 
       ws.on('error', (error) => {
-        logger.error('WebSocket error:', error);
+        logger.error('[WS Error]:', error);
       });
     });
   }
@@ -515,6 +525,7 @@ export class WebSocketServer {
   }
 
   private async handleAuth(ws: WebSocket, token: string) {
+    logger.info(`[Auth] Validating token: "${token ? '***' : '(empty)'}"`);
     if (this.authManager.validateToken(token)) {
       const clientId = this.authManager.generateClientId();
       this.clients.set(clientId, ws);
@@ -525,8 +536,9 @@ export class WebSocketServer {
         data: { clientId }
       });
 
-      logger.info(`Client ${clientId} authenticated`);
+      logger.info(`[Auth] Client ${clientId} authenticated successfully`);
     } else {
+      logger.warn(`[Auth] Invalid token rejected`);
       this.sendError(ws, 'Invalid token');
       ws.close();
     }

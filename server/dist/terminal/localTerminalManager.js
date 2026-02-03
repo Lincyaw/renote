@@ -409,6 +409,24 @@ class ZellijTerminalConnection {
     static listManagedSessions() {
         return listZellijSessions().filter(s => s.startsWith('renote-'));
     }
+    /**
+     * Kill a zellij session by sessionId (without needing a connection)
+     * Tries both shell and claude session names
+     */
+    static killSessionById(sessionId) {
+        const sanitized = sessionId.replace(/[^a-zA-Z0-9]/g, '-');
+        const shellName = `renote-shell-${sanitized}`;
+        const claudeName = `renote-claude-${sanitized}`;
+        let killed = false;
+        const existingSessions = listZellijSessions();
+        if (existingSessions.includes(shellName)) {
+            killed = killZellijSession(shellName) || killed;
+        }
+        if (existingSessions.includes(claudeName)) {
+            killed = killZellijSession(claudeName) || killed;
+        }
+        return killed;
+    }
 }
 exports.ZellijTerminalConnection = ZellijTerminalConnection;
 exports.LocalTerminalConnection = ZellijTerminalConnection;

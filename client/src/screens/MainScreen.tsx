@@ -46,6 +46,24 @@ export default function MainScreen() {
 
   const isConnected = status.ws === 'connected';
 
+  // 递归检查导航状态树，判断是否有嵌套的子导航器可以返回
+  const canNestedNavigatorGoBack = useCallback((state: any): boolean => {
+    if (!state || !state.routes) return false;
+
+    const currentRoute = state.routes[state.index];
+    // 如果当前路由有嵌套状态，递归检查
+    if (currentRoute?.state) {
+      // 嵌套导航器有多个路由，说明可以返回
+      if (currentRoute.state.routes && currentRoute.state.routes.length > 1) {
+        return true;
+      }
+      // 继续递归检查更深层的嵌套
+      return canNestedNavigatorGoBack(currentRoute.state);
+    }
+
+    return false;
+  }, []);
+
   // 处理 Android 返回键/手势
   useEffect(() => {
     const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
@@ -56,10 +74,14 @@ export default function MainScreen() {
       }
 
       // Claude Tab 和 Config Tab 使用 React Navigation 嵌套导航器
-      // navigationRef 可以感知整个导航树，包括嵌套的 Stack
-      if (navigationRef.isReady() && navigationRef.canGoBack()) {
-        navigationRef.goBack();
-        return true;
+      // 由于我们手动渲染 Tab 内容，navigationRef.canGoBack() 只检查根导航器
+      // 需要检查嵌套导航器的状态
+      if (navigationRef.isReady()) {
+        const rootState = navigationRef.getRootState();
+        if (canNestedNavigatorGoBack(rootState)) {
+          navigationRef.goBack();
+          return true;
+        }
       }
 
       // 如果所有导航器都在根页面，允许默认行为（退出应用）
@@ -67,7 +89,7 @@ export default function MainScreen() {
     });
 
     return () => backHandler.remove();
-  }, [activeTab, filesStore]);
+  }, [activeTab, filesStore, canNestedNavigatorGoBack]);
 
   // 检测未连接状态并弹窗提示
   useEffect(() => {

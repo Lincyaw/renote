@@ -17,6 +17,7 @@ import MenuGroup from './ui/MenuGroup';
 import ConnectionSettingsScreen from './config/ConnectionSettingsScreen';
 import SavedServersScreen from './config/SavedServersScreen';
 import PortForwardScreen from './config/PortForwardScreen';
+import DiagnosticsScreen from './config/DiagnosticsScreen';
 import { colors, spacing, typography, radius, animation } from '../theme';
 
 type ConfigStackParamList = {
@@ -24,6 +25,7 @@ type ConfigStackParamList = {
   ConnectionSettings: undefined;
   SavedServers: undefined;
   PortForward: undefined;
+  Diagnostics: undefined;
 };
 
 const Stack = createNativeStackNavigator<ConfigStackParamList>();
@@ -58,6 +60,14 @@ function AboutIcon() {
   return (
     <View style={[styles.menuIcon, { backgroundColor: colors.text.tertiary }]}>
       <Text style={styles.menuIconText}>i</Text>
+    </View>
+  );
+}
+
+function DiagnosticsIcon() {
+  return (
+    <View style={[styles.menuIcon, { backgroundColor: colors.warning }]}>
+      <Text style={styles.menuIconText}>⚙</Text>
     </View>
   );
 }
@@ -148,6 +158,11 @@ function MeScreen({ navigation }: MeScreenProps) {
           badge={activeForwards > 0 ? activeForwards : undefined}
           onPress={() => navigation.navigate('PortForward')}
         />
+        <MenuItem
+          icon={<DiagnosticsIcon />}
+          label="网络诊断"
+          onPress={() => navigation.navigate('Diagnostics')}
+        />
       </MenuGroup>
 
       {/* About Group */}
@@ -201,6 +216,11 @@ export default function ConfigTab() {
         name="PortForward"
         component={PortForwardScreen}
         options={{ title: '端口转发' }}
+      />
+      <Stack.Screen
+        name="Diagnostics"
+        component={DiagnosticsScreen}
+        options={{ title: '网络诊断' }}
       />
     </Stack.Navigator>
   );

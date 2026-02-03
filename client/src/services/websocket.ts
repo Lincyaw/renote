@@ -36,33 +36,45 @@ export class WebSocketClient {
     this.clearReconnectTimeout();
     const url = `ws://${host}:${port}`;
 
+    console.log(`[WS] Connecting to ${url}...`);
+    console.log(`[WS] Token: ${token ? '***' : '(empty)'}`);
+
     useConnectionStore.getState().setWSStatus('connecting');
 
-    this.ws = new WebSocket(url);
+    try {
+      this.ws = new WebSocket(url);
+      console.log('[WS] WebSocket object created');
+    } catch (error) {
+      console.error('[WS] Failed to create WebSocket:', error);
+      return;
+    }
 
     this.ws.onopen = () => {
-      console.log('WebSocket connected');
+      console.log('[WS] Connection opened, sending auth message');
       this.reconnectAttempts = 0;
 
       // Send auth message
       this.send({ type: 'auth', token });
+      console.log('[WS] Auth message sent');
     };
 
     this.ws.onmessage = (event) => {
       try {
         const message = JSON.parse(event.data);
+        console.log(`[WS] Received message: ${message.type}`);
         this.handleMessage(message);
       } catch (error) {
-        console.error('Error parsing WebSocket message:', error);
+        console.error('[WS] Error parsing message:', error);
       }
     };
 
     this.ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
+      console.error('[WS] WebSocket error:', error);
+      console.error('[WS] Error details:', JSON.stringify(error));
     };
 
-    this.ws.onclose = () => {
-      console.log('WebSocket disconnected');
+    this.ws.onclose = (event) => {
+      console.log(`[WS] Connection closed: code=${event.code}, reason=${event.reason}, wasClean=${event.wasClean}`);
       this.stopHeartbeat();
       useConnectionStore.getState().setWSStatus('disconnected');
       if (!this.isManualDisconnect) {

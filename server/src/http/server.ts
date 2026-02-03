@@ -19,8 +19,8 @@ export function createHttpServer() {
   });
 
   const httpPort = CONFIG.port + 1;
-  app.listen(httpPort, () => {
-    logger.info(`HTTP server running on port ${httpPort}`);
+  app.listen(httpPort, CONFIG.host, () => {
+    logger.info(`HTTP server running on ${CONFIG.host}:${httpPort}`);
   });
 
   return app;

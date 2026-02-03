@@ -92,10 +92,15 @@ function generateTerminalHtml(wsUrl: string, initialFontSize: number): string {
       statusEl.textContent = reconnectAttempts > 0 ? 'Reconnecting...' : 'Connecting...';
       statusEl.className = 'connecting';
 
+      console.log('[Terminal WS] Connecting to:', wsUrl);
+      window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'log', message: 'Connecting to: ' + wsUrl }));
+
       ws = new WebSocket(wsUrl);
       ws.binaryType = 'arraybuffer';
 
       ws.onopen = () => {
+        console.log('[Terminal WS] Connection opened');
+        window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'log', message: 'WebSocket opened' }));
         reconnectAttempts = 0;
         statusEl.className = 'connected';
         sendResize();
@@ -114,6 +119,11 @@ function generateTerminalHtml(wsUrl: string, initialFontSize: number): string {
       };
 
       ws.onclose = (event) => {
+        console.log('[Terminal WS] Connection closed:', event.code, event.reason);
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          type: 'log',
+          message: 'WebSocket closed: code=' + event.code + ', reason=' + event.reason
+        }));
         statusEl.textContent = 'Disconnected';
         statusEl.className = 'error';
 
@@ -123,12 +133,17 @@ function generateTerminalHtml(wsUrl: string, initialFontSize: number): string {
         } else {
           window.ReactNativeWebView.postMessage(JSON.stringify({
             type: 'error',
-            message: event.reason || 'Connection closed'
+            message: event.reason || 'Connection closed (code: ' + event.code + ')'
           }));
         }
       };
 
-      ws.onerror = () => {
+      ws.onerror = (errorEvent) => {
+        console.log('[Terminal WS] Connection error:', errorEvent);
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          type: 'log',
+          message: 'WebSocket error occurred'
+        }));
         statusEl.textContent = 'Connection error';
         statusEl.className = 'error';
       };
@@ -187,7 +202,6 @@ function generateTerminalHtml(wsUrl: string, initialFontSize: number): string {
     fitAddon = new FitAddon.FitAddon();
     term.loadAddon(fitAddon);
     term.open(document.getElementById('terminal'));
-    fitAddon.fit();
 
     term.onData((data) => {
       const modifiedData = applyModifiers(data);
@@ -196,15 +210,27 @@ function generateTerminalHtml(wsUrl: string, initialFontSize: number): string {
       }
     });
 
+    // 使用 ResizeObserver 监听终端容器尺寸变化
+    // 这比 window.resize 更可靠，因为它能监测到容器自身的尺寸变化（如键盘弹出时）
+    let resizeTimeout = null;
+    const resizeObserver = new ResizeObserver(() => {
+      if (resizeTimeout) clearTimeout(resizeTimeout);
+      // 防抖：50ms 延迟确保布局稳定后再计算尺寸
+      resizeTimeout = setTimeout(() => {
+        fitAddon.fit();
+        sendResize();
+      }, 50);
+    });
+    resizeObserver.observe(document.getElementById('terminal'));
+
+    // 保留 window resize 事件作为后备方案
     window.addEventListener('resize', () => {
       fitAddon.fit();
       sendResize();
     });
 
-    setTimeout(() => {
-      fitAddon.fit();
-      connect();
-    }, 100);
+    // 在 DOM 就绪后连接 WebSocket
+    setTimeout(connect, 100);
 
     window.writeToTerminal = (data) => {
       if (ws && ws.readyState === WebSocket.OPEN) {
@@ -311,10 +337,20 @@ export default function TerminalView({ sessionId, onBack }: TerminalViewProps) {
   }, [keyboardHeight, isLoading]);
 
   const wsUrl = useMemo(() => {
-    if (!connectionParams) return null;
+    console.log('[TerminalView] Building wsUrl, connectionParams:', connectionParams ? {
+      host: connectionParams.host,
+      port: connectionParams.port,
+      token: connectionParams.token ? '***' : '(empty)'
+    } : null);
+    if (!connectionParams) {
+      console.warn('[TerminalView] connectionParams is null, cannot build wsUrl');
+      return null;
+    }
     const { host, port, token } = connectionParams;
     const params = new URLSearchParams({ token, sessionId, type: terminalType });
-    return `ws://${host}:${port}/terminal?${params.toString()}`;
+    const url = `ws://${host}:${port}/terminal?${params.toString()}`;
+    console.log('[TerminalView] Built wsUrl:', url.replace(token, '***'));
+    return url;
   }, [connectionParams, sessionId, terminalType]);
 
   const terminalHtml = useMemo(() => {
@@ -325,6 +361,7 @@ export default function TerminalView({ sessionId, onBack }: TerminalViewProps) {
   const handleMessage = useCallback((event: any) => {
     try {
       const message = JSON.parse(event.nativeEvent.data);
+      console.log('[TerminalView] WebView message:', message.type, message.message || '');
       switch (message.type) {
         case 'connected':
           setIsLoading(false);
@@ -332,8 +369,12 @@ export default function TerminalView({ sessionId, onBack }: TerminalViewProps) {
           updateSessionStatus(sessionId, 'active');
           break;
         case 'error':
+          console.error('[TerminalView] Terminal error:', message.message);
           setError(message.message || 'Connection failed');
           updateSessionStatus(sessionId, 'error');
+          break;
+        case 'log':
+          console.log('[TerminalView WebView Log]:', message.message);
           break;
         case 'modifier_consumed':
           if (message.key === 'ctrl') setCtrlActive(false);
@@ -341,7 +382,7 @@ export default function TerminalView({ sessionId, onBack }: TerminalViewProps) {
           break;
       }
     } catch (err) {
-      // Error handled silently
+      console.error('[TerminalView] Failed to parse WebView message:', err);
     }
   }, [sessionId, updateSessionStatus]);
 

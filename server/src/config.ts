@@ -4,6 +4,7 @@ import { homedir } from 'os';
 config();
 
 export const CONFIG = {
+  host: process.env.HOST || '0.0.0.0',
   port: parseInt(process.env.PORT || '8080'),
   authToken: process.env.AUTH_TOKEN || '',
   claudeHome: process.env.CLAUDE_HOME || `${homedir()}/.claude`,

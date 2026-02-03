@@ -79,25 +79,34 @@ export default function ConnectionSettingsScreen({ navigation }: Props) {
       return;
     }
 
+    console.log(`[Connect] Attempting to connect to ${host}:${wsPort}`);
     setIsConnecting(true);
 
     try {
+      console.log('[Connect] Calling wsClient.connect...');
       wsClient.connect(host, parseInt(wsPort), token);
+
+      console.log('[Connect] Waiting for connection...');
       await wsClient.waitForConnection(10000);
 
+      console.log('[Connect] Connection successful, saving config...');
       const serverConfig = buildServerConfig();
       await offlineCache.saveServer(serverConfig);
       await offlineCache.setLastServer(serverConfig.id);
 
+      console.log('[Connect] Setting connectionParams in store...');
       setConnectionParams({
         host,
         port: parseInt(wsPort),
         token,
       });
 
+      console.log('[Connect] Setting server in store...');
       setServer(serverConfig);
+      console.log('[Connect] Done, navigating back...');
       navigation.goBack();
     } catch (error: any) {
+      console.error('[Connect] Connection failed:', error);
       Alert.alert('连接失败', error.message || '未知错误');
     } finally {
       setIsConnecting(false);

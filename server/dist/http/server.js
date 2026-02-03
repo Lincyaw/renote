@@ -21,8 +21,8 @@ function createHttpServer() {
         res.json({ token: config_1.CONFIG.authToken });
     });
     const httpPort = config_1.CONFIG.port + 1;
-    app.listen(httpPort, () => {
-        logger_1.logger.info(`HTTP server running on port ${httpPort}`);
+    app.listen(httpPort, config_1.CONFIG.host, () => {
+        logger_1.logger.info(`HTTP server running on ${config_1.CONFIG.host}:${httpPort}`);
     });
     return app;
 }

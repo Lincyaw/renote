@@ -5,6 +5,7 @@ const dotenv_1 = require("dotenv");
 const os_1 = require("os");
 (0, dotenv_1.config)();
 exports.CONFIG = {
+    host: process.env.HOST || '0.0.0.0',
     port: parseInt(process.env.PORT || '8080'),
     authToken: process.env.AUTH_TOKEN || '',
     claudeHome: process.env.CLAUDE_HOME || `${(0, os_1.homedir)()}/.claude`,
