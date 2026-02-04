@@ -6,6 +6,7 @@ import SessionList from './SessionList';
 import ConversationView from './ConversationView';
 import SubagentView from './SubagentView';
 import ToolDetailView from './ToolDetailView';
+import ClaudeTerminalView from './ClaudeTerminalView';
 
 const Stack = createNativeStackNavigator<ClaudeStackParamList>();
 
@@ -23,6 +24,7 @@ export default function ClaudeTab() {
       <Stack.Screen name="Conversation" component={ConversationView} />
       <Stack.Screen name="Subagent" component={SubagentView} />
       <Stack.Screen name="ToolDetail" component={ToolDetailView} />
+      <Stack.Screen name="ClaudeTerminal" component={ClaudeTerminalView} />
     </Stack.Navigator>
   );
 }

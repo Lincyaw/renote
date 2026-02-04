@@ -38,6 +38,8 @@ class TerminalWebSocketHandler {
             const type = (url.searchParams.get('type') || 'shell');
             const cols = parseInt(url.searchParams.get('cols') || '80', 10);
             const rows = parseInt(url.searchParams.get('rows') || '24', 10);
+            const claudeArgsParam = url.searchParams.get('claudeArgs');
+            const cwd = url.searchParams.get('cwd') || undefined;
             // Validate token
             if (!this.authManager.validateToken(token)) {
                 logger_1.logger.warn('Terminal WebSocket: invalid token');
@@ -54,7 +56,13 @@ class TerminalWebSocketHandler {
             this.wsToSession.set(ws, { clientId, sessionId });
             logger_1.logger.info(`Terminal WebSocket connected: clientId=${clientId}, sessionId=${sessionId}, type=${type}, ${cols}x${rows}`);
             const connection = localTerminalManager_1.localTerminalManager.getOrCreateConnection(clientId);
-            const options = { type, cols, rows };
+            const options = {
+                type,
+                cols,
+                rows,
+                cwd,
+                claudeArgs: claudeArgsParam ? JSON.parse(decodeURIComponent(claudeArgsParam)) : undefined,
+            };
             const success = connection.startTerminal(sessionId, (data) => {
                 // Send terminal output as text frame
                 if (ws.readyState === ws_1.default.OPEN) {

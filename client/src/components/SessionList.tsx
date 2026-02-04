@@ -13,11 +13,12 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSessionBrowserStore } from '../store/sessionBrowserStore';
 import { wsClient } from '../services/websocket';
 import { SessionInfo } from '../types';
-import { SessionsScreenProps } from '../navigation/types';
+import { SessionsScreenProps, ClaudeStackParamList } from '../navigation/types';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { colors, spacing, typography, radius, animation } from '../theme';
 
 export default function SessionList() {
-  const navigation = useNavigation<SessionsScreenProps['navigation']>();
+  const navigation = useNavigation<NativeStackNavigationProp<ClaudeStackParamList, 'Sessions'>>();
   const route = useRoute<SessionsScreenProps['route']>();
   const { workspaceDirName, workspaceDisplayPath } = route.params;
   const [refreshing, setRefreshing] = useState(false);
@@ -59,6 +60,15 @@ export default function SessionList() {
     });
   };
 
+  const handleNewConversation = useCallback(() => {
+    // 导航到新建对话界面（不传 sessionId）
+    useSessionBrowserStore.getState().clearSessionData();
+    navigation.navigate('Conversation', {
+      workspaceDirName,
+      sessionId: undefined,
+    });
+  }, [navigation, workspaceDirName]);
+
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '';
     const d = new Date(dateStr);
@@ -88,13 +98,22 @@ export default function SessionList() {
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity
-        style={styles.backBtn}
-        onPress={() => navigation.goBack()}
-        activeOpacity={animation.activeOpacity}
-      >
-        <Text style={styles.backText}>← {workspaceDisplayPath || 'Back'}</Text>
-      </TouchableOpacity>
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.backBtn}
+          onPress={() => navigation.goBack()}
+          activeOpacity={animation.activeOpacity}
+        >
+          <Text style={styles.backText}>← {workspaceDisplayPath || 'Back'}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.newConversationBtn}
+          onPress={handleNewConversation}
+          activeOpacity={animation.activeOpacity}
+        >
+          <Text style={styles.newConversationText}>+ 新建对话</Text>
+        </TouchableOpacity>
+      </View>
       <TextInput
         style={styles.search}
         placeholder="Search sessions..."
@@ -134,6 +153,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background.primary,
   },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingRight: spacing.md,
+  },
   backBtn: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
@@ -142,6 +167,17 @@ const styles = StyleSheet.create({
     fontSize: typography.size.body,
     color: colors.primary,
     fontWeight: typography.weight.medium,
+  },
+  newConversationBtn: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
+  },
+  newConversationText: {
+    color: colors.text.inverse,
+    fontSize: typography.size.subheadline,
+    fontWeight: typography.weight.semibold,
   },
   search: {
     marginHorizontal: spacing.md,

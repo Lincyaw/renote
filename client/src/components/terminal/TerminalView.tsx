@@ -283,6 +283,8 @@ export default function TerminalView({ sessionId, onBack }: TerminalViewProps) {
 
   const session = getSession(sessionId);
   const terminalType: TerminalType = session?.type || 'shell';
+  const claudeArgs = session?.claudeArgs;
+  const cwd = session?.cwd;
 
   // Load saved font size on mount
   useEffect(() => {
@@ -348,10 +350,16 @@ export default function TerminalView({ sessionId, onBack }: TerminalViewProps) {
     }
     const { host, port, token } = connectionParams;
     const params = new URLSearchParams({ token, sessionId, type: terminalType });
+    if (claudeArgs && claudeArgs.length > 0) {
+      params.set('claudeArgs', encodeURIComponent(JSON.stringify(claudeArgs)));
+    }
+    if (cwd) {
+      params.set('cwd', cwd);
+    }
     const url = `ws://${host}:${port}/terminal?${params.toString()}`;
     console.log('[TerminalView] Built wsUrl:', url.replace(token, '***'));
     return url;
-  }, [connectionParams, sessionId, terminalType]);
+  }, [connectionParams, sessionId, terminalType, claudeArgs, cwd]);
 
   const terminalHtml = useMemo(() => {
     if (!wsUrl || !fontSizeLoaded) return null;

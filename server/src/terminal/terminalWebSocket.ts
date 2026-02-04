@@ -55,6 +55,8 @@ export class TerminalWebSocketHandler {
       const type = (url.searchParams.get('type') || 'shell') as TerminalType;
       const cols = parseInt(url.searchParams.get('cols') || '80', 10);
       const rows = parseInt(url.searchParams.get('rows') || '24', 10);
+      const claudeArgsParam = url.searchParams.get('claudeArgs');
+      const cwd = url.searchParams.get('cwd') || undefined;
 
       // Validate token
       if (!this.authManager.validateToken(token)) {
@@ -76,7 +78,13 @@ export class TerminalWebSocketHandler {
       logger.info(`Terminal WebSocket connected: clientId=${clientId}, sessionId=${sessionId}, type=${type}, ${cols}x${rows}`);
 
       const connection = localTerminalManager.getOrCreateConnection(clientId);
-      const options: TerminalOptions = { type, cols, rows };
+      const options: TerminalOptions = {
+        type,
+        cols,
+        rows,
+        cwd,
+        claudeArgs: claudeArgsParam ? JSON.parse(decodeURIComponent(claudeArgsParam)) : undefined,
+      };
 
       const success = connection.startTerminal(
         sessionId,

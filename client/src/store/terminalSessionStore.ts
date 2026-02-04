@@ -9,13 +9,20 @@ export interface TerminalSession {
   createdAt: number;
   lastActiveAt: number;
   status: 'active' | 'connecting' | 'closed' | 'error';
+  claudeArgs?: string[];
+  cwd?: string;
+}
+
+interface CreateSessionOptions {
+  claudeArgs?: string[];
+  cwd?: string;
 }
 
 interface TerminalSessionState {
   sessions: TerminalSession[];
   activeSessionId: string | null;
 
-  createSession: (type?: TerminalType) => TerminalSession;
+  createSession: (type?: TerminalType, options?: CreateSessionOptions) => TerminalSession;
   removeSession: (id: string) => void;
   setActiveSession: (id: string | null) => void;
   updateSessionStatus: (id: string, status: TerminalSession['status']) => void;
@@ -43,7 +50,7 @@ export const useTerminalSessionStore = create<TerminalSessionState>((set, get) =
   sessions: [],
   activeSessionId: null,
 
-  createSession: (type: TerminalType = 'shell') => {
+  createSession: (type: TerminalType = 'shell', options?: CreateSessionOptions) => {
     const id = generateSessionId(type);
     const now = Date.now();
     const existingSessions = get().sessions;
@@ -57,6 +64,8 @@ export const useTerminalSessionStore = create<TerminalSessionState>((set, get) =
       createdAt: now,
       lastActiveAt: now,
       status: 'connecting',
+      claudeArgs: options?.claudeArgs,
+      cwd: options?.cwd,
     };
 
     set((state) => ({

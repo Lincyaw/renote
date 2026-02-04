@@ -11,6 +11,7 @@ import { listWorkspaces, listSessions, getSessionMessages, getSessionMessagesPag
 import { LocalTerminalHandler } from '../terminal';
 import { GitHandler } from '../git';
 import { terminalWebSocketHandler } from '../terminal/terminalWebSocket';
+import { claudeChatService } from '../claude/chatService';
 
 export class WebSocketServer {
   private wss: WebSocket.Server;
@@ -143,6 +144,9 @@ export class WebSocketServer {
         break;
       case 'get_session_folder_info':
         await this.handleGetSessionFolderInfo(ws, message);
+        break;
+      case 'send_claude_message':
+        await this.handleSendClaudeMessage(ws, message);
         break;
       default:
         const clientId = this.getClientId(ws);
@@ -521,6 +525,63 @@ export class WebSocketServer {
     } catch (error) {
       logger.error('Error getting session folder info:', error);
       this.sendError(ws, `Failed to get session folder info: ${error}`);
+    }
+  }
+
+  private async handleSendClaudeMessage(ws: WebSocket, message: ClientMessage) {
+    const clientId = this.getClientId(ws);
+    if (!clientId) {
+      this.sendError(ws, 'Not authenticated');
+      return;
+    }
+
+    try {
+      const { data } = message as any;
+      if (!data || !data.workspaceDirName || !data.message) {
+        this.sendError(ws, 'workspaceDirName and message are required');
+        return;
+      }
+
+      const { workspaceDirName, sessionId, newSessionId, message: userMessage, allowedTools } = data;
+
+      // 解码 workspaceDirName 为实际路径
+      const cwd = '/' + workspaceDirName.replace(/-/g, '/');
+
+      logger.info(`[SendClaudeMessage] Sending message to Claude CLI`);
+      logger.info(`[SendClaudeMessage] CWD: ${cwd}`);
+      logger.info(`[SendClaudeMessage] SessionId: ${sessionId || 'none'}`);
+      logger.info(`[SendClaudeMessage] NewSessionId: ${newSessionId || 'none'}`);
+      if (allowedTools && allowedTools.length > 0) {
+        logger.info(`[SendClaudeMessage] AllowedTools: ${allowedTools.join(', ')}`);
+      }
+
+      // 调用 chatService 发送消息
+      const result = await claudeChatService.sendMessage({
+        workspaceDirName,
+        sessionId,
+        newSessionId,
+        message: userMessage,
+        cwd,
+        allowedTools,
+      });
+
+      // 响应客户端
+      this.send(ws, {
+        type: 'send_claude_message_response',
+        data: {
+          success: result.success,
+          error: result.error,
+          sessionId: result.sessionId,
+        },
+      });
+
+      // 如果成功，响应会通过现有的 watchSession 机制推送
+      if (result.success) {
+        logger.info(`[SendClaudeMessage] Message sent successfully, responses will be pushed via watchSession`);
+      }
+    } catch (error) {
+      logger.error('Error sending Claude message:', error);
+      this.sendError(ws, `Failed to send message: ${error}`);
     }
   }
 

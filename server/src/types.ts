@@ -205,3 +205,24 @@ export interface GetSessionFolderInfoMessage extends ClientMessage {
   workspace: string;
   sessionId: string;
 }
+
+// Chat Mode - Send message to Claude CLI
+export interface SendClaudeMessageRequest extends ClientMessage {
+  type: 'send_claude_message';
+  data: {
+    workspaceDirName: string;
+    sessionId?: string;      // 恢复会话
+    newSessionId?: string;   // 新建会话时的 ID
+    message: string;
+    allowedTools?: string[]; // 允许的工具列表
+  };
+}
+
+export interface SendClaudeMessageResponse extends ServerMessage {
+  type: 'send_claude_message_response';
+  data: {
+    success: boolean;
+    error?: string;
+    sessionId?: string;
+  };
+}

@@ -242,6 +242,17 @@ export class WebSocketClient {
         useSessionBrowserStore.getState().setSessionFolderInfo(message.data);
         break;
 
+      case 'send_claude_message_response':
+        // 发送消息的响应
+        this.emitter.emit('send_claude_message_response', message.data);
+        if (!message.data.success) {
+          useToastStore.getState().addToast({
+            type: 'error',
+            message: message.data.error || 'Failed to send message',
+          });
+        }
+        break;
+
       case 'git_check_repo_response':
         useFilesStore.getState().setIsGitRepo(message.data.isGitRepo);
         break;
@@ -519,6 +530,42 @@ export class WebSocketClient {
 
   requestSessionFolderInfo(workspace: string, sessionId: string) {
     this.send({ type: 'get_session_folder_info', workspace, sessionId });
+  }
+
+  /**
+   * 发送消息给 Claude CLI（聊天模式）
+   * @param workspaceDirName 工作区目录名称（编码后的路径）
+   * @param sessionId 可选，恢复已有会话
+   * @param newSessionId 可选，新建会话时指定的 ID
+   * @param message 要发送的消息
+   * @param allowedTools 可选，允许的工具列表
+   */
+  sendClaudeMessage(
+    workspaceDirName: string,
+    sessionId: string | undefined,
+    newSessionId: string | undefined,
+    message: string,
+    allowedTools?: string[]
+  ): void {
+    this.send({
+      type: 'send_claude_message',
+      data: {
+        workspaceDirName,
+        sessionId,
+        newSessionId,
+        message,
+        allowedTools,
+      },
+    });
+  }
+
+  /**
+   * 监听 Claude 消息发送响应
+   */
+  onSendClaudeMessageResponse(
+    callback: (data: { success: boolean; error?: string; sessionId?: string }) => void
+  ): () => void {
+    return this.emitter.on('send_claude_message_response', callback);
   }
 }
 
