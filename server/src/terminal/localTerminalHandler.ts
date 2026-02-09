@@ -11,7 +11,7 @@ export class LocalTerminalHandler {
   }
 
   canHandle(messageType: string): boolean {
-    return messageType.startsWith('terminal_');
+    return messageType.startsWith('terminal_') || messageType === 'list_managed_terminals';
   }
 
   async handle(ws: WebSocket, clientId: string, message: ClientMessage): Promise<void> {
@@ -30,6 +30,9 @@ export class LocalTerminalHandler {
         break;
       case 'terminal_list':
         this.handleList(ws, clientId);
+        break;
+      case 'list_managed_terminals':
+        this.handleListManaged(ws);
         break;
       default:
         logger.warn(`Unknown terminal message type: ${message.type}`);
@@ -165,6 +168,39 @@ export class LocalTerminalHandler {
     this.sendFn(ws, {
       type: 'terminal_list_response',
       data: { terminals: terminalInfos },
+    });
+  }
+
+  /**
+   * List all managed zellij sessions (survives reconnects)
+   * Parses session names like "renote-shell-xxx" / "renote-claude-xxx"
+   */
+  private handleListManaged(ws: WebSocket): void {
+    const managedSessions = ZellijTerminalConnection.listManagedSessions();
+
+    const terminals = managedSessions.map((name) => {
+      // Parse "renote-{type}-{sanitizedId}" pattern
+      let type: TerminalType = 'shell';
+      let sessionId = name;
+
+      if (name.startsWith('renote-shell-')) {
+        type = 'shell';
+        sessionId = name.substring('renote-shell-'.length);
+      } else if (name.startsWith('renote-claude-')) {
+        type = 'claude';
+        sessionId = name.substring('renote-claude-'.length);
+      }
+
+      return {
+        sessionId,
+        type,
+        zellijName: name,
+      };
+    });
+
+    this.sendFn(ws, {
+      type: 'list_managed_terminals_response',
+      data: { terminals },
     });
   }
 

@@ -75,7 +75,15 @@ function isZellijAvailable(): boolean {
 }
 
 /**
- * List existing zellij sessions
+ * Strip ANSI escape codes from a string
+ */
+function stripAnsi(str: string): string {
+  // eslint-disable-next-line no-control-regex
+  return str.replace(/\x1b\[[0-9;]*m/g, '');
+}
+
+/**
+ * List existing zellij sessions (names only, all sessions)
  */
 function listZellijSessions(): string[] {
   try {
@@ -83,7 +91,28 @@ function listZellijSessions(): string[] {
       encoding: 'utf-8',
       env: { ...process.env, PATH: getExtendedPath() },
     });
-    return output.trim().split('\n').filter(s => s.length > 0);
+    return output.trim().split('\n').map(stripAnsi).filter(s => s.length > 0);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * List alive (non-EXITED) zellij sessions
+ * Parses full `zellij list-sessions` output to check status
+ */
+function listAliveZellijSessions(): string[] {
+  try {
+    const output = execSync('zellij list-sessions 2>/dev/null || true', {
+      encoding: 'utf-8',
+      env: { ...process.env, PATH: getExtendedPath() },
+    });
+    const lines = output.trim().split('\n').filter(s => s.length > 0);
+    return lines
+      .map(line => stripAnsi(line))
+      .filter(line => !line.includes('(EXITED'))
+      .map(line => line.split(' ')[0])
+      .filter(name => name.length > 0);
   } catch {
     return [];
   }
@@ -453,10 +482,10 @@ export class ZellijTerminalConnection {
   }
 
   /**
-   * List all zellij sessions managed by this server
+   * List alive zellij sessions managed by this server
    */
   static listManagedSessions(): string[] {
-    return listZellijSessions().filter(s => s.startsWith('renote-'));
+    return listAliveZellijSessions().filter(s => s.startsWith('renote-'));
   }
 
   /**

@@ -2,3 +2,5 @@
 node_modules/
 android/
 ios/
+server/web-dist/
+web/dist/

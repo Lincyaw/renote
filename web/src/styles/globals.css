@@ -1,0 +1,49 @@
+@import "tailwindcss";
+
+/* Mobile viewport height fix - accounts for browser chrome */
+html, body, #root {
+  height: 100dvh;
+  height: 100vh; /* fallback */
+  overflow: hidden;
+}
+
+@supports (height: 100dvh) {
+  html, body, #root {
+    height: 100dvh;
+  }
+}
+
+/* Safe area padding for notched devices */
+.safe-area-pb {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Terminal styles */
+.xterm {
+  padding: 4px;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #374151;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #4b5563;
+}
+
+/* Highlight.js theme overrides for dark mode */
+.hljs {
+  background: #111827 !important;
+  color: #e5e7eb !important;
+}

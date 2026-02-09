@@ -1,4 +1,6 @@
 import express from 'express';
+import path from 'path';
+import fs from 'fs';
 import { CONFIG } from '../config';
 import { logger } from '../utils/logger';
 
@@ -17,6 +19,18 @@ export function createHttpServer() {
     }
     res.json({ token: CONFIG.authToken });
   });
+
+  // Serve web client static files
+  const webDistPath = process.env.WEB_DIST_PATH
+    || path.join(__dirname, '../../web-dist');
+
+  if (fs.existsSync(webDistPath)) {
+    logger.info(`Serving web client from ${webDistPath}`);
+    app.use(express.static(webDistPath));
+    app.get('{*path}', (_req, res) => {
+      res.sendFile(path.join(webDistPath, 'index.html'));
+    });
+  }
 
   const httpPort = CONFIG.port + 1;
   app.listen(httpPort, CONFIG.host, () => {

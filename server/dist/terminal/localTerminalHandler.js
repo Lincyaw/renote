@@ -8,7 +8,7 @@ class LocalTerminalHandler {
         this.sendFn = sendFn;
     }
     canHandle(messageType) {
-        return messageType.startsWith('terminal_');
+        return messageType.startsWith('terminal_') || messageType === 'list_managed_terminals';
     }
     async handle(ws, clientId, message) {
         switch (message.type) {
@@ -26,6 +26,9 @@ class LocalTerminalHandler {
                 break;
             case 'terminal_list':
                 this.handleList(ws, clientId);
+                break;
+            case 'list_managed_terminals':
+                this.handleListManaged(ws);
                 break;
             default:
                 logger_1.logger.warn(`Unknown terminal message type: ${message.type}`);
@@ -135,6 +138,35 @@ class LocalTerminalHandler {
         this.sendFn(ws, {
             type: 'terminal_list_response',
             data: { terminals: terminalInfos },
+        });
+    }
+    /**
+     * List all managed zellij sessions (survives reconnects)
+     * Parses session names like "renote-shell-xxx" / "renote-claude-xxx"
+     */
+    handleListManaged(ws) {
+        const managedSessions = localTerminalManager_1.ZellijTerminalConnection.listManagedSessions();
+        const terminals = managedSessions.map((name) => {
+            // Parse "renote-{type}-{sanitizedId}" pattern
+            let type = 'shell';
+            let sessionId = name;
+            if (name.startsWith('renote-shell-')) {
+                type = 'shell';
+                sessionId = name.substring('renote-shell-'.length);
+            }
+            else if (name.startsWith('renote-claude-')) {
+                type = 'claude';
+                sessionId = name.substring('renote-claude-'.length);
+            }
+            return {
+                sessionId,
+                type,
+                zellijName: name,
+            };
+        });
+        this.sendFn(ws, {
+            type: 'list_managed_terminals_response',
+            data: { terminals },
         });
     }
     cleanup(clientId) {
