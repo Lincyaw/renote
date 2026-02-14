@@ -1,4 +1,5 @@
 import type { TabId } from './AppShell';
+import TabIcon from '../icons/TabIcon';
 
 interface Tab {
   id: TabId;
@@ -36,7 +37,9 @@ export default function Sidebar({ tabs, activeTab, onTabChange, collapsed }: Sid
               }`}
               title={collapsed ? tab.label : undefined}
             >
-              <span className="font-mono text-xs w-6 text-center shrink-0">{tab.icon}</span>
+              <span className="shrink-0">
+                <TabIcon tabId={tab.id} active={isActive} size={18} />
+              </span>
               {!collapsed && <span>{tab.label}</span>}
             </button>
           );

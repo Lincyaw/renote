@@ -1,0 +1,17 @@
+[Unit]
+Description=Renote Server - Remote Dev Client for Claude Code
+After=network.target
+
+[Service]
+Type=simple
+Environment=PATH=/home/nn/.nvm/versions/node/v25.2.1/bin:/usr/local/bin:/usr/bin:/bin
+Environment=PORT=9080
+Environment=AUTH_TOKEN=
+Environment=CLAUDE_HOME=/home/nn/.claude
+Environment=LOG_LEVEL=info
+ExecStart=/home/nn/.nvm/versions/node/v25.2.1/bin/node /home/nn/.nvm/versions/node/v25.2.1/bin/renote-server
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

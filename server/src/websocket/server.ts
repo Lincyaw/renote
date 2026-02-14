@@ -201,7 +201,17 @@ export class WebSocketServer {
       });
     } catch (error) {
       logger.error('Error generating file tree:', error);
-      this.sendError(ws, `Failed to generate file tree: ${error}`);
+      const errorPath = message.path || process.cwd();
+      this.send(ws, {
+        type: 'file_tree_response',
+        data: {
+          tree: { name: errorPath.split('/').pop() || '', path: '', type: 'directory', children: [] },
+          totalNodes: 0,
+          truncated: false,
+          accessErrors: [String(error)],
+          rootPath: errorPath,
+        },
+      });
     }
   }
 

@@ -47,3 +47,91 @@ html, body, #root {
   background: #111827 !important;
   color: #e5e7eb !important;
 }
+
+/* Hide scrollbar for horizontal scroll areas */
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+/* Micro-interactions */
+
+/* Tab content fade-in */
+@keyframes fadeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-fade-slide-in {
+  animation: fadeSlideIn 150ms ease-out;
+}
+
+/* Toast slide-in from right */
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@keyframes slideOutRight {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+}
+.animate-slide-in-right {
+  animation: slideInRight 200ms ease-out;
+}
+.animate-slide-out-right {
+  animation: slideOutRight 150ms ease-in forwards;
+}
+
+/* Press feedback for interactive list items */
+.press-feedback {
+  transition: transform 100ms ease;
+}
+.press-feedback:active {
+  transform: scale(0.98);
+}
+
+/* Button hover brightness */
+.hover-brightness {
+  transition: filter 150ms ease;
+}
+.hover-brightness:hover {
+  filter: brightness(1.15);
+}
+
+/* Connection pulse */
+@keyframes statusPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+.animate-status-pulse {
+  animation: statusPulse 2s ease-in-out infinite;
+}
+
+/* Middle-truncate for file names */
+.middle-truncate {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  direction: rtl;
+  text-align: left;
+}

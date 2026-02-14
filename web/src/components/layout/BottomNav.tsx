@@ -1,4 +1,5 @@
 import type { TabId } from './AppShell';
+import TabIcon from '../icons/TabIcon';
 
 interface Tab {
   id: TabId;
@@ -25,7 +26,7 @@ export default function BottomNav({ tabs, activeTab, onTabChange }: BottomNavPro
               isActive ? 'text-blue-400' : 'text-gray-500'
             }`}
           >
-            <span className="font-mono text-xs">{tab.icon}</span>
+            <TabIcon tabId={tab.id} active={isActive} size={20} />
             <span className="text-[10px]">{tab.label}</span>
           </button>
         );

@@ -263,6 +263,10 @@ export class WebSocketClient {
         break;
       }
 
+      case 'search_response':
+        useFilesStore.getState().setSearchResults(message.data.results || []);
+        break;
+
       case 'list_managed_terminals_response':
         useTerminalSessionStore.getState().syncManagedSessions(message.data.terminals);
         break;
@@ -438,6 +442,10 @@ export class WebSocketClient {
   requestFileDiff(filePath: string, staged: boolean = false, path?: string) {
     useFilesStore.getState().setDiffLoading(true);
     this.send({ type: 'git_file_diff', filePath, staged, path });
+  }
+  requestSearch(query: string, path?: string, options?: { maxResults?: number }) {
+    useFilesStore.getState().setSearchLoading(true);
+    this.send({ type: 'search', query, path, options });
   }
   requestSubagents(workspace: string, sessionId: string) { this.send({ type: 'list_subagents', workspace, sessionId }); }
   requestSubagentMessages(workspace: string, sessionId: string, agentId: string) {

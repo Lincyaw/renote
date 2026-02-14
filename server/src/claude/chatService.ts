@@ -1,4 +1,7 @@
-import { spawn, ChildProcess } from 'child_process';
+import { spawn, execSync, ChildProcess } from 'child_process';
+import { existsSync } from 'fs';
+import { join } from 'path';
+import { homedir } from 'os';
 import { logger } from '../utils/logger';
 
 export interface SendMessageOptions {
@@ -16,9 +19,48 @@ export interface SendMessageResult {
   sessionId?: string;      // 返回实际使用的 sessionId
 }
 
+function resolveClaudePath(): string | null {
+  // 1. 尝试 which/where 从当前 PATH 解析
+  try {
+    const resolved = execSync('which claude', { encoding: 'utf-8' }).trim();
+    if (resolved) return resolved;
+  } catch {
+    // which 失败，继续检查常见位置
+  }
+
+  // 2. 检查常见安装位置
+  const home = homedir();
+  const candidates = [
+    join(home, '.local', 'bin', 'claude'),
+    join(home, '.npm-global', 'bin', 'claude'),
+    '/usr/local/bin/claude',
+    '/usr/bin/claude',
+  ];
+
+  for (const p of candidates) {
+    if (existsSync(p)) return p;
+  }
+
+  return null;
+}
+
 class ClaudeChatService {
   // 存储正在运行的进程，按 sessionId 索引
   private runningProcesses = new Map<string, ChildProcess>();
+  private claudePath: string | null = null;
+
+  constructor() {
+    this.claudePath = resolveClaudePath();
+    if (this.claudePath) {
+      logger.info(`[ChatService] Claude CLI found at: ${this.claudePath}`);
+    } else {
+      logger.warn('[ChatService] Claude CLI not found. Reply functionality will be unavailable.');
+    }
+  }
+
+  getClaudePath(): string | null {
+    return this.claudePath;
+  }
 
   /**
    * 发送消息给 Claude CLI
@@ -63,13 +105,20 @@ class ClaudeChatService {
       logger.info(`[ChatService] Allowed tools: ${allowedTools.join(', ')}`);
     }
 
+    if (!this.claudePath) {
+      return {
+        success: false,
+        error: 'Claude CLI not found. Please install it and restart the server.',
+        sessionId: effectiveSessionId,
+      };
+    }
+
     return new Promise((resolve) => {
-      const proc = spawn('claude', args, {
+      const proc = spawn(this.claudePath!, args, {
         cwd: cwd || process.cwd(),
         stdio: ['pipe', 'pipe', 'pipe'],
         env: {
           ...process.env,
-          // 确保 Claude CLI 不会等待用户输入
           TERM: 'dumb',
         },
       });

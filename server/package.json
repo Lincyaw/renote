@@ -1,17 +1,19 @@
 {
   "name": "renote-server",
-  "version": "1.0.3",
+  "version": "1.0.5",
   "description": "WebSocket server for Renote - mobile remote development client with Claude Code integration",
   "main": "dist/index.js",
   "bin": {
     "renote-server": "dist/index.js"
   },
   "files": [
-    "dist/**/*"
+    "dist/**/*",
+    "web-dist/**/*"
   ],
   "scripts": {
     "dev": "nodemon --exec ts-node src/index.ts",
     "build": "tsc",
+    "build:all": "cd ../web && npm run build && cd ../server && rm -rf web-dist && cp -r ../web/dist web-dist && tsc",
     "start": "node dist/index.js",
     "test": "jest",
     "test:watch": "jest --watch",

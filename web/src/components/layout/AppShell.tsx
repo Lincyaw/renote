@@ -1,8 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Sidebar from './Sidebar';
 import BottomNav from './BottomNav';
 import ConnectionStatus from './ConnectionStatus';
 import Toast from './Toast';
+import WelcomeScreen from './WelcomeScreen';
+import DisconnectOverlay from './DisconnectOverlay';
+import { useConnectionStore } from '../../store/connectionStore';
 
 import ConfigTab from '../config/ConfigTab';
 import TerminalTab from '../terminal/TerminalTab';
@@ -28,6 +31,20 @@ export default function AppShell() {
   const [activeTab, setActiveTab] = useState<TabId>('terminal');
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [isTablet, setIsTablet] = useState(window.innerWidth >= 768 && window.innerWidth < 1024);
+
+  const wsStatus = useConnectionStore(s => s.status.ws);
+  const isAutoReconnecting = useConnectionStore(s => s.isAutoReconnecting);
+  const wasConnected = useRef(false);
+
+  // Track if user has ever connected (to distinguish first-use vs disconnect)
+  useEffect(() => {
+    if (wsStatus === 'connected') {
+      wasConnected.current = true;
+    }
+  }, [wsStatus]);
+
+  const showWelcome = wsStatus === 'disconnected' && !wasConnected.current && !isAutoReconnecting;
+  const showDisconnectOverlay = wsStatus === 'disconnected' && wasConnected.current && isAutoReconnecting;
 
   useEffect(() => {
     const handleResize = () => {
@@ -74,6 +91,16 @@ export default function AppShell() {
     }
   };
 
+  // Show welcome screen when not connected and never connected
+  if (showWelcome) {
+    return (
+      <div className="h-full flex flex-col bg-gray-950 text-gray-100 overflow-hidden">
+        <Toast />
+        <WelcomeScreen />
+      </div>
+    );
+  }
+
   return (
     <div className="h-full flex flex-col bg-gray-950 text-gray-100 overflow-hidden">
       <Toast />
@@ -89,7 +116,7 @@ export default function AppShell() {
         )}
 
         {/* Main content */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 flex flex-col overflow-hidden relative">
           <div className="flex items-center justify-between border-b border-gray-800 bg-gray-900/50">
             <div className="px-4 py-2 text-sm font-medium text-gray-300">
               {TABS.find(t => t.id === activeTab)?.label}
@@ -97,9 +124,12 @@ export default function AppShell() {
             <ConnectionStatus />
           </div>
 
-          <div className="flex-1 overflow-hidden">
+          <div className="flex-1 overflow-hidden animate-fade-slide-in" key={activeTab}>
             {renderContent()}
           </div>
+
+          {/* Disconnect overlay */}
+          {showDisconnectOverlay && <DisconnectOverlay reconnectDelay={5000} />}
         </div>
       </div>
 

@@ -163,6 +163,51 @@ function decodeWorkspacePath(dirName) {
     }
     return '/' + parts.join('/');
 }
+/**
+ * Resolve a Claude projects dirName (e.g. "-home-nn-workspace-proj-rcabench-paper")
+ * back to an actual filesystem path. The encoding replaces "/" (and "_") with "-",
+ * making it ambiguous. We probe the filesystem trying "-", "_", and "/" as joiners
+ * between segments to find the real path.
+ */
+async function resolveDirNameToPath(dirName) {
+    const segments = dirName.split('-').filter(Boolean);
+    if (segments.length === 0)
+        return '/';
+    async function isDir(p) {
+        try {
+            return (await fs.promises.stat(p)).isDirectory();
+        }
+        catch {
+            return false;
+        }
+    }
+    // Try joining adjacent segments with each joiner and probe the filesystem
+    const JOINERS = ['-', '_'];
+    async function probe(current, remaining) {
+        if (remaining.length === 0) {
+            return await isDir(current) ? current : null;
+        }
+        // Try consuming 1..N remaining segments as a single directory component
+        for (let take = remaining.length; take >= 1; take--) {
+            const parts = remaining.slice(0, take);
+            // For multi-segment chunks, try all joiner characters
+            const joinVariants = take === 1
+                ? [parts[0]]
+                : JOINERS.map(j => parts.join(j));
+            for (const name of joinVariants) {
+                const candidate = current + '/' + name;
+                if (await isDir(candidate)) {
+                    const result = await probe(candidate, remaining.slice(take));
+                    if (result)
+                        return result;
+                }
+            }
+        }
+        return null;
+    }
+    const result = await probe('', segments);
+    return result || ('/' + segments.join('/'));
+}
 async function listWorkspaces() {
     try {
         const entries = await fs.promises.readdir(PROJECTS_DIR, { withFileTypes: true });
@@ -174,10 +219,12 @@ async function listWorkspaces() {
             const indexPath = path.join(workspaceDir, 'sessions-index.json');
             let indexCount = 0;
             let lastModified = 0;
+            let originalPath = '';
             // Read sessions-index.json if available
             try {
                 const raw = await fs.promises.readFile(indexPath, 'utf-8');
                 const index = JSON.parse(raw);
+                originalPath = index.originalPath || '';
                 const sessions = index.entries || [];
                 indexCount = sessions.length;
                 for (const s of sessions) {
@@ -218,9 +265,16 @@ async function listWorkspaces() {
             const sessionCount = Math.max(indexCount, jsonlCount);
             // Only add workspace if it has sessions
             if (sessionCount > 0) {
+                // fullPath: prefer originalPath from index, fall back to probing filesystem
+                const fullPath = originalPath || await resolveDirNameToPath(entry.name);
+                const home = os.homedir();
+                const displayPath = fullPath.startsWith(home + '/')
+                    ? '~' + fullPath.slice(home.length)
+                    : fullPath;
                 workspaces.push({
                     dirName: entry.name,
-                    displayPath: decodeWorkspacePath(entry.name),
+                    displayPath,
+                    fullPath,
                     sessionCount,
                     lastModified,
                 });

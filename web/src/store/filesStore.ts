@@ -4,10 +4,20 @@ import type { FileNode, GitFileStatus } from '../types';
 export type { FileNode, GitFileStatus };
 
 type ViewMode = 'normal' | 'git';
+type SearchMode = 'filename' | 'content';
+
+export interface SearchResult {
+  file: string;
+  line: number;
+  column: number;
+  content: string;
+  match: string;
+}
 
 interface FilesState {
   fileTree: FileNode | null;
   rootPath: string | null;
+  workspacePath: string | null;
   selectedFile: string | null;
   loading: boolean;
   error: string | null;
@@ -22,6 +32,10 @@ interface FilesState {
   diffContent: string | null;
   diffFilePath: string | null;
   diffLoading: boolean;
+  searchQuery: string;
+  searchMode: SearchMode;
+  searchResults: SearchResult[];
+  searchLoading: boolean;
 
   setFileTree: (tree: FileNode | null, rootPath?: string, truncated?: boolean, accessErrors?: string[]) => void;
   setSelectedFile: (path: string | null) => void;
@@ -40,11 +54,18 @@ interface FilesState {
   setDiffContent: (content: string | null, filePath: string | null) => void;
   setDiffLoading: (loading: boolean) => void;
   clearDiff: () => void;
+  setSearchQuery: (query: string) => void;
+  setSearchMode: (mode: SearchMode) => void;
+  setSearchResults: (results: SearchResult[]) => void;
+  setSearchLoading: (loading: boolean) => void;
+  clearSearch: () => void;
+  switchWorkspace: (path: string | null) => void;
 }
 
 export const useFilesStore = create<FilesState>((set) => ({
   fileTree: null,
   rootPath: null,
+  workspacePath: null,
   selectedFile: null,
   loading: true,
   error: null,
@@ -59,6 +80,10 @@ export const useFilesStore = create<FilesState>((set) => ({
   diffContent: null,
   diffFilePath: null,
   diffLoading: false,
+  searchQuery: '',
+  searchMode: 'content',
+  searchResults: [],
+  searchLoading: false,
 
   setFileTree: (tree, rootPath, truncated = false, accessErrors = []) => set({
     fileTree: tree,
@@ -108,4 +133,31 @@ export const useFilesStore = create<FilesState>((set) => ({
   setDiffContent: (content, filePath) => set({ diffContent: content, diffFilePath: filePath, diffLoading: false }),
   setDiffLoading: (loading) => set({ diffLoading: loading }),
   clearDiff: () => set({ diffContent: null, diffFilePath: null }),
+  setSearchQuery: (query) => set({ searchQuery: query }),
+  setSearchMode: (mode) => set({ searchMode: mode }),
+  setSearchResults: (results) => set({ searchResults: results, searchLoading: false }),
+  setSearchLoading: (loading) => set({ searchLoading: loading }),
+  clearSearch: () => set({ searchQuery: '', searchResults: [], searchLoading: false }),
+  switchWorkspace: (path) => set({
+    workspacePath: path,
+    fileTree: null,
+    rootPath: null,
+    selectedFile: null,
+    loading: true,
+    error: null,
+    expandedDirs: new Set<string>(),
+    loadingDirs: new Set<string>(),
+    truncated: false,
+    accessErrors: [],
+    viewMode: 'normal',
+    isGitRepo: false,
+    gitFiles: [],
+    gitLoading: false,
+    diffContent: null,
+    diffFilePath: null,
+    diffLoading: false,
+    searchQuery: '',
+    searchResults: [],
+    searchLoading: false,
+  }),
 }));

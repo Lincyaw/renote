@@ -1,9 +1,11 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useTerminalSessionStore } from '../../store/terminalSessionStore';
 import { useConnectionStore } from '../../store/connectionStore';
 import { wsClient } from '../../services/websocket';
 import TerminalView from './TerminalView';
-import TerminalSessionList from './TerminalSessionList';
+import TerminalTabBar from './TerminalTabBar';
+import MobileSessionTabs from './MobileSessionTabs';
+import EmptyState from '../shared/EmptyState';
 
 export default function TerminalTab() {
   const { sessions, activeSessionId, createSession, removeSession, setActiveSession } = useTerminalSessionStore();
@@ -23,103 +25,94 @@ export default function TerminalTab() {
     setActiveSession(id);
   }, [setActiveSession]);
 
+  // Keyboard shortcuts for terminal tab switching
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!e.ctrlKey || sessions.length === 0) return;
+
+      // Ctrl+Tab / Ctrl+Shift+Tab: cycle sessions
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        const currentIdx = sessions.findIndex(s => s.id === activeSessionId);
+        if (e.shiftKey) {
+          const prevIdx = currentIdx <= 0 ? sessions.length - 1 : currentIdx - 1;
+          const prevSession = sessions[prevIdx];
+          if (prevSession) setActiveSession(prevSession.id);
+        } else {
+          const nextIdx = currentIdx >= sessions.length - 1 ? 0 : currentIdx + 1;
+          const nextSession = sessions[nextIdx];
+          if (nextSession) setActiveSession(nextSession.id);
+        }
+        return;
+      }
+
+      // Ctrl+1..9: switch by index
+      const num = parseInt(e.key);
+      if (num >= 1 && num <= 9 && num <= sessions.length) {
+        e.preventDefault();
+        const session = sessions[num - 1];
+        if (session) setActiveSession(session.id);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [sessions, activeSessionId, setActiveSession]);
+
   const activeSession = sessions.find(s => s.id === activeSessionId);
 
   if (wsStatus !== 'connected') {
     return (
-      <div className="flex-1 flex items-center justify-center text-gray-500 text-sm">
-        Connect to a server to use the terminal.
-      </div>
+      <EmptyState
+        icon={
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="4 17 10 11 4 5" />
+            <line x1="12" y1="19" x2="20" y2="19" />
+          </svg>
+        }
+        title="Terminal"
+        description="Connect to a server to use the terminal."
+      />
     );
   }
 
   return (
-    <div className="flex h-full">
-      {/* Session sidebar */}
-      <div className="w-56 shrink-0 border-r border-gray-800 flex flex-col bg-gray-900/50 max-md:hidden">
-        <div className="p-3 border-b border-gray-800 flex flex-col gap-2">
-          <span className="text-sm font-medium text-gray-300">Sessions</span>
-          <div className="flex gap-1.5">
-            <button
-              onClick={() => handleNewSession('shell')}
-              className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1 rounded transition-colors flex-1"
-            >
-              + Shell
-            </button>
-            <button
-              onClick={() => handleNewSession('claude')}
-              className="text-xs bg-purple-600 hover:bg-purple-700 text-white px-2.5 py-1 rounded transition-colors flex-1"
-            >
-              + Claude
-            </button>
-          </div>
-        </div>
-        <div className="flex-1 overflow-y-auto">
-          <TerminalSessionList onSelect={handleSelectSession} onClose={handleCloseSession} />
-        </div>
+    <div className="flex flex-col h-full">
+      {/* Desktop: compact tab bar */}
+      <div className="max-md:hidden">
+        <TerminalTabBar
+          onSelect={handleSelectSession}
+          onClose={handleCloseSession}
+          onNew={handleNewSession}
+        />
+      </div>
+
+      {/* Mobile: pill tabs */}
+      <div className="md:hidden">
+        <MobileSessionTabs
+          onSelect={handleSelectSession}
+          onClose={handleCloseSession}
+          onNew={handleNewSession}
+        />
       </div>
 
       {/* Terminal content */}
-      <div className="flex-1 flex flex-col">
-        {/* Mobile session bar */}
-        <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-800 md:hidden">
-          <button
-            onClick={() => handleNewSession('shell')}
-            className="text-xs bg-blue-600 text-white px-2 py-1 rounded"
-          >
-            + Shell
-          </button>
-          <button
-            onClick={() => handleNewSession('claude')}
-            className="text-xs bg-purple-600 text-white px-2 py-1 rounded"
-          >
-            + Claude
-          </button>
-          {sessions.length > 0 && (
-            <select
-              value={activeSessionId || ''}
-              onChange={(e) => setActiveSession(e.target.value || null)}
-              className="flex-1 bg-gray-800 text-gray-200 text-xs rounded px-2 py-1 border border-gray-700"
-            >
-              <option value="">Select session</option>
-              {sessions.map(s => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
-            </select>
-          )}
-          {activeSessionId && (
-            <button
-              onClick={() => handleCloseSession(activeSessionId)}
-              className="text-xs text-red-400 hover:text-red-300 px-2 py-1"
-            >
-              Close
-            </button>
-          )}
-        </div>
-
-        {activeSession ? (
-          <TerminalView key={activeSession.id} sessionId={activeSession.id} />
-        ) : (
-          <div className="flex-1 flex flex-col items-center justify-center text-gray-500 gap-3">
-            <div className="text-4xl font-mono opacity-20">{'>_'}</div>
-            <p className="text-sm">Create a terminal session to get started</p>
-            <div className="flex gap-2">
-              <button
-                onClick={() => handleNewSession('shell')}
-                className="text-sm bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
-              >
-                New Shell
-              </button>
-              <button
-                onClick={() => handleNewSession('claude')}
-                className="text-sm bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors"
-              >
-                New Claude
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
+      {activeSession ? (
+        <TerminalView key={activeSession.id} sessionId={activeSession.id} />
+      ) : (
+        <EmptyState
+          icon={
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="4 17 10 11 4 5" />
+              <line x1="12" y1="19" x2="20" y2="19" />
+            </svg>
+          }
+          title="No active sessions"
+          description="Create a terminal session to get started"
+          action={{ label: 'New Shell', onClick: () => handleNewSession('shell') }}
+          secondaryAction={{ label: 'New Claude', onClick: () => handleNewSession('claude') }}
+        />
+      )}
     </div>
   );
 }

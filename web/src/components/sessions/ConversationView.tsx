@@ -5,6 +5,8 @@ import remarkGfm from 'remark-gfm';
 import 'highlight.js/styles/github-dark.css';
 import { useSessionBrowserStore } from '../../store/sessionBrowserStore';
 import { wsClient } from '../../services/websocket';
+import { CodeBlock, PreBlock } from './CodeBlock';
+import { useSwipeBack } from '../../hooks/useSwipeBack';
 import type { SessionMessage, SubagentInfo } from '../../types';
 
 interface Props {
@@ -34,6 +36,36 @@ function isJsonContent(content: string): boolean {
   return false;
 }
 
+function getToolSummary(toolName?: string, toolInput?: Record<string, unknown>): string | null {
+  if (!toolName || !toolInput) return null;
+
+  switch (toolName) {
+    case 'Read':
+      return typeof toolInput.file_path === 'string' ? toolInput.file_path.split('/').slice(-2).join('/') : null;
+    case 'Bash':
+      return typeof toolInput.command === 'string' ? toolInput.command.substring(0, 50) : null;
+    case 'Edit': {
+      const filePath = typeof toolInput.file_path === 'string' ? toolInput.file_path.split('/').pop() : null;
+      const oldStr = typeof toolInput.old_string === 'string' ? toolInput.old_string : '';
+      const newStr = typeof toolInput.new_string === 'string' ? toolInput.new_string : '';
+      const lines = Math.max(oldStr.split('\n').length, newStr.split('\n').length);
+      return filePath ? `${lines} lines in ${filePath}` : null;
+    }
+    case 'Write':
+      return typeof toolInput.file_path === 'string' ? toolInput.file_path.split('/').slice(-2).join('/') : null;
+    case 'Glob':
+      return typeof toolInput.pattern === 'string' ? toolInput.pattern : null;
+    case 'Grep':
+      return typeof toolInput.pattern === 'string' ? toolInput.pattern : null;
+    case 'WebFetch':
+      return typeof toolInput.url === 'string' ? toolInput.url.substring(0, 50) : null;
+    case 'Task':
+      return typeof toolInput.description === 'string' ? toolInput.description : null;
+    default:
+      return null;
+  }
+}
+
 function MessageBubble({ item, allMessages, onToolPress }: {
   item: SessionMessage;
   allMessages: SessionMessage[];
@@ -42,7 +74,7 @@ function MessageBubble({ item, allMessages, onToolPress }: {
   if (item.type === 'user') {
     return (
       <div className="flex justify-end mb-3">
-        <div className="bg-blue-600 rounded-2xl px-4 py-2.5 max-w-[85%]">
+        <div className="bg-blue-600 rounded-2xl px-4 py-2.5 max-w-[95%] md:max-w-[85%]">
           <div className="text-[10px] text-blue-200 mb-0.5">User</div>
           <div className="text-sm text-white whitespace-pre-wrap">{item.content}</div>
         </div>
@@ -54,7 +86,7 @@ function MessageBubble({ item, allMessages, onToolPress }: {
     const isJson = isJsonContent(item.content);
     return (
       <div className="flex justify-start mb-3">
-        <div className="bg-gray-800 rounded-2xl px-4 py-2.5 max-w-[85%] overflow-hidden">
+        <div className="bg-gray-800 rounded-2xl px-4 py-2.5 max-w-[95%] md:max-w-[85%] overflow-hidden">
           <div className="text-[10px] text-gray-400 mb-0.5">Assistant</div>
           {isJson ? (
             <pre className="text-xs text-gray-300 font-mono whitespace-pre-wrap overflow-x-auto">{item.content}</pre>
@@ -63,6 +95,17 @@ function MessageBubble({ item, allMessages, onToolPress }: {
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
                 rehypePlugins={[rehypeHighlight]}
+                components={{
+                  pre: PreBlock,
+                  code: ({ className, children, ...props }) => {
+                    // Inline code vs block code
+                    const isBlock = className?.includes('language-') || className?.includes('hljs');
+                    if (isBlock) {
+                      return <CodeBlock className={className} {...props}>{children}</CodeBlock>;
+                    }
+                    return <code className={className} {...props}>{children}</code>;
+                  },
+                }}
               >
                 {item.content}
               </ReactMarkdown>
@@ -77,18 +120,34 @@ function MessageBubble({ item, allMessages, onToolPress }: {
     const toolResult = allMessages.find(
       m => m.type === 'tool_result' && m.uuid.includes(item.uuid.replace('_tool', ''))
     );
+
+    // Determine success/failure from result
+    const isError = toolResult?.content?.toLowerCase().includes('error') ||
+                    toolResult?.content?.toLowerCase().includes('failed') ||
+                    toolResult?.content?.startsWith('Error:');
+    const borderColor = toolResult
+      ? (isError ? 'border-l-red-500' : 'border-l-green-500')
+      : 'border-l-gray-600';
+
+    // Smart parameter summary
+    const toolSummary = getToolSummary(item.toolName, item.toolInput);
+
     return (
       <div className="flex justify-start mb-2">
         <button
           onClick={() => onToolPress(item, toolResult)}
-          className="bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 max-w-[85%] hover:bg-gray-800 transition-colors text-left"
+          className={`bg-gray-800/60 border border-gray-700 border-l-2 ${borderColor} rounded-lg px-3 py-2 max-w-[95%] md:max-w-[85%] hover:bg-gray-800 transition-colors text-left press-feedback`}
         >
           <div className="flex items-center gap-2">
-            <span className="text-xs text-blue-400 font-mono font-bold">{'>_'}</span>
             <span className="text-xs font-medium text-blue-400">{item.toolName || 'Tool'}</span>
-            <span className="text-gray-600">&gt;</span>
+            {toolSummary && (
+              <>
+                <span className="text-gray-600">:</span>
+                <span className="text-xs text-gray-400 truncate font-mono">{toolSummary}</span>
+              </>
+            )}
           </div>
-          {toolResult && (
+          {toolResult && !toolSummary && (
             <div className="text-[10px] text-gray-500 mt-1 truncate font-mono">
               {toolResult.content.substring(0, 60)}...
             </div>
@@ -125,8 +184,12 @@ export default function ConversationView({ workspaceDirName, sessionId: initialS
   const [activeTab, setActiveTab] = useState<'messages' | 'subagents'>('messages');
   const [allowedTools, setAllowedTools] = useState<string[]>([]);
   const [showPermissions, setShowPermissions] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchMatchIndex, setSearchMatchIndex] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const {
     messages, loading, subagents, sessionFolderInfo,
@@ -163,6 +226,27 @@ export default function ConversationView({ workspaceDirName, sessionId: initialS
     () => messages.filter(m => m.type === 'user' || m.type === 'assistant' || m.type === 'tool_use'),
     [messages]
   );
+
+  // Search matches
+  const searchMatches = useMemo(() => {
+    if (!searchQuery.trim()) return [];
+    const lowerQuery = searchQuery.toLowerCase();
+    return filteredMessages
+      .map((msg, idx) => ({ idx, matches: msg.content.toLowerCase().includes(lowerQuery) }))
+      .filter(m => m.matches)
+      .map(m => m.idx);
+  }, [filteredMessages, searchQuery]);
+
+  // Scroll to current search match
+  useEffect(() => {
+    if (searchMatches.length > 0 && scrollContainerRef.current) {
+      const targetIdx = searchMatches[searchMatchIndex];
+      if (targetIdx !== undefined) {
+        const el = scrollContainerRef.current.querySelector(`[data-msg-idx="${targetIdx}"]`);
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+  }, [searchMatchIndex, searchMatches]);
 
   const handleLoadMore = useCallback(() => {
     if (!hasMoreMessages || loadingMore || loading || !currentSessionId) return;
@@ -211,6 +295,8 @@ export default function ConversationView({ workspaceDirName, sessionId: initialS
 
   const subagentCount = sessionFolderInfo?.subagentCount || subagents.length;
 
+  useSwipeBack({ onSwipeBack: handleBack });
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
@@ -218,7 +304,71 @@ export default function ConversationView({ workspaceDirName, sessionId: initialS
         <button onClick={handleBack} className="text-sm text-blue-400 hover:text-blue-300">
           &larr; Sessions
         </button>
+        <div className="flex-1" />
+        {!isNewConversation && (
+          <button
+            onClick={() => {
+              setSearchOpen(!searchOpen);
+              if (!searchOpen) setTimeout(() => searchInputRef.current?.focus(), 50);
+              if (searchOpen) { setSearchQuery(''); setSearchMatchIndex(0); }
+            }}
+            className="text-gray-400 hover:text-gray-200 p-1"
+            title="Search messages"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+          </button>
+        )}
       </div>
+
+      {/* Search bar */}
+      {searchOpen && (
+        <div className="px-3 py-1.5 border-b border-gray-800 flex items-center gap-2 bg-gray-900/80">
+          <input
+            ref={searchInputRef}
+            type="text"
+            value={searchQuery}
+            onChange={(e) => { setSearchQuery(e.target.value); setSearchMatchIndex(0); }}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') { setSearchOpen(false); setSearchQuery(''); }
+              else if (e.key === 'Enter' && searchMatches.length > 0) {
+                setSearchMatchIndex(prev => (prev + (e.shiftKey ? -1 : 1) + searchMatches.length) % searchMatches.length);
+              }
+            }}
+            placeholder="Search messages..."
+            className="flex-1 bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200 focus:outline-none focus:border-blue-500"
+          />
+          {searchQuery && (
+            <span className="text-[10px] text-gray-500 shrink-0">
+              {searchMatches.length > 0 ? `${searchMatchIndex + 1}/${searchMatches.length}` : '0/0'}
+            </span>
+          )}
+          {searchMatches.length > 1 && (
+            <div className="flex gap-0.5 shrink-0">
+              <button
+                onClick={() => setSearchMatchIndex(prev => (prev - 1 + searchMatches.length) % searchMatches.length)}
+                className="text-xs text-gray-400 hover:text-gray-200 px-1"
+              >
+                ↑
+              </button>
+              <button
+                onClick={() => setSearchMatchIndex(prev => (prev + 1) % searchMatches.length)}
+                className="text-xs text-gray-400 hover:text-gray-200 px-1"
+              >
+                ↓
+              </button>
+            </div>
+          )}
+          <button
+            onClick={() => { setSearchOpen(false); setSearchQuery(''); setSearchMatchIndex(0); }}
+            className="text-xs text-gray-500 hover:text-gray-300 px-1"
+          >
+            x
+          </button>
+        </div>
+      )}
 
       {/* Tab bar */}
       {!isNewConversation && (
@@ -266,12 +416,17 @@ export default function ConversationView({ workspaceDirName, sessionId: initialS
           )}
 
           {filteredMessages.map((msg, i) => (
-            <MessageBubble
+            <div
               key={msg.uuid + '_' + i}
-              item={msg}
-              allMessages={messages}
-              onToolPress={onToolPress}
-            />
+              data-msg-idx={i}
+              className={searchMatches.includes(i) ? 'ring-1 ring-yellow-500/50 rounded-lg' : ''}
+            >
+              <MessageBubble
+                item={msg}
+                allMessages={messages}
+                onToolPress={onToolPress}
+              />
+            </div>
           ))}
           <div ref={messagesEndRef} />
         </div>

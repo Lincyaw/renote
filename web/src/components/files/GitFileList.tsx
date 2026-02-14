@@ -4,13 +4,14 @@ import type { GitFileStatus } from '../../types';
 
 interface Props {
   onFileSelect: (file: GitFileStatus) => void;
+  workspacePath?: string | null;
 }
 
-export default function GitFileList({ onFileSelect }: Props) {
+export default function GitFileList({ onFileSelect, workspacePath }: Props) {
   const { gitFiles, gitLoading } = useFilesStore();
 
   const handleRefresh = () => {
-    wsClient.requestGitStatus();
+    wsClient.requestGitStatus(workspacePath || undefined);
   };
 
   if (gitLoading) {
@@ -47,6 +48,25 @@ export default function GitFileList({ onFileSelect }: Props) {
   const staged = gitFiles.filter(f => f.staged);
   const unstaged = gitFiles.filter(f => !f.staged);
 
+  const FileRow = ({ file, prefix }: { file: GitFileStatus; prefix: string }) => (
+    <button
+      key={`${prefix}-${file.path}`}
+      onClick={() => onFileSelect(file)}
+      className="w-full text-left flex items-center gap-2 px-3 py-2 hover:bg-gray-800/50 active:bg-gray-800 transition-colors"
+    >
+      <span className={`text-xs font-mono w-4 shrink-0 ${statusColor[file.status]}`}>
+        {statusIcon[file.status]}
+      </span>
+      <span className="text-xs text-gray-300 font-mono truncate flex-1">{file.path}</span>
+      {file.additions !== undefined && file.deletions !== undefined && (
+        <span className="text-[10px] font-mono shrink-0 flex gap-1">
+          {file.additions > 0 && <span className="text-green-400">+{file.additions}</span>}
+          {file.deletions > 0 && <span className="text-red-400">-{file.deletions}</span>}
+        </span>
+      )}
+    </button>
+  );
+
   return (
     <div className="flex-1 overflow-y-auto">
       {staged.length > 0 && (
@@ -55,16 +75,7 @@ export default function GitFileList({ onFileSelect }: Props) {
             Staged ({staged.length})
           </div>
           {staged.map((file) => (
-            <button
-              key={`staged-${file.path}`}
-              onClick={() => onFileSelect(file)}
-              className="w-full text-left flex items-center gap-2 px-3 py-2 hover:bg-gray-800/50 transition-colors"
-            >
-              <span className={`text-xs font-mono w-4 shrink-0 ${statusColor[file.status]}`}>
-                {statusIcon[file.status]}
-              </span>
-              <span className="text-xs text-gray-300 font-mono truncate">{file.path}</span>
-            </button>
+            <FileRow key={`staged-${file.path}`} file={file} prefix="staged" />
           ))}
         </>
       )}
@@ -75,16 +86,7 @@ export default function GitFileList({ onFileSelect }: Props) {
             Unstaged ({unstaged.length})
           </div>
           {unstaged.map((file) => (
-            <button
-              key={`unstaged-${file.path}`}
-              onClick={() => onFileSelect(file)}
-              className="w-full text-left flex items-center gap-2 px-3 py-2 hover:bg-gray-800/50 transition-colors"
-            >
-              <span className={`text-xs font-mono w-4 shrink-0 ${statusColor[file.status]}`}>
-                {statusIcon[file.status]}
-              </span>
-              <span className="text-xs text-gray-300 font-mono truncate">{file.path}</span>
-            </button>
+            <FileRow key={`unstaged-${file.path}`} file={file} prefix="unstaged" />
           ))}
         </>
       )}

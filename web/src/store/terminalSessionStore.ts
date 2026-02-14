@@ -14,6 +14,7 @@ interface TerminalSessionState {
   setActiveSession: (id: string | null) => void;
   updateSessionStatus: (id: string, status: TerminalSession['status']) => void;
   updateSessionActivity: (id: string) => void;
+  renameSession: (id: string, name: string) => void;
   getSession: (id: string) => TerminalSession | undefined;
   clearAllSessions: () => void;
   syncManagedSessions: (managed: Array<{ sessionId: string; type: string; zellijName: string }>) => void;
@@ -83,6 +84,12 @@ export const useTerminalSessionStore = create<TerminalSessionState>((set, get) =
   updateSessionActivity: (id) => set((state) => ({
     sessions: state.sessions.map((s) =>
       s.id === id ? { ...s, lastActiveAt: Date.now() } : s
+    ),
+  })),
+
+  renameSession: (id, name) => set((state) => ({
+    sessions: state.sessions.map((s) =>
+      s.id === id ? { ...s, name } : s
     ),
   })),
 

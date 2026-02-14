@@ -31,13 +31,13 @@ function TreeNode({ node, depth, onFileSelect }: {
     }
   }, [isDir, isExpanded, node.path, node.children, rootPath, onFileSelect]);
 
-  const indent = depth * 16;
+  const indent = depth * 12;
 
   return (
     <>
       <button
         onClick={handleClick}
-        className="w-full text-left flex items-center gap-1.5 py-1 px-2 hover:bg-gray-800/50 transition-colors group"
+        className="w-full text-left flex items-center gap-1.5 py-1.5 px-2 hover:bg-gray-800/50 active:bg-gray-800 transition-colors group min-h-[36px] md:min-h-0 md:py-1 press-feedback"
         style={{ paddingLeft: indent + 8 }}
       >
         {isDir ? (

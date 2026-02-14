@@ -2,6 +2,7 @@ import { useEffect, useCallback } from 'react';
 import { useSessionBrowserStore } from '../../store/sessionBrowserStore';
 import { useConnectionStore } from '../../store/connectionStore';
 import { wsClient } from '../../services/websocket';
+import EmptyState from '../shared/EmptyState';
 import type { WorkspaceInfo } from '../../types';
 
 interface Props {
@@ -56,9 +57,16 @@ export default function WorkspaceList({ onSelect }: Props) {
         {loading ? (
           <div className="p-4 text-center text-gray-500 text-sm">Loading workspaces...</div>
         ) : filtered.length === 0 ? (
-          <div className="p-4 text-center text-gray-500 text-sm">
-            {workspaces.length === 0 ? 'No workspaces found' : 'No matches'}
-          </div>
+          <EmptyState
+            icon={
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
+              </svg>
+            }
+            title={workspaces.length === 0 ? 'No workspaces found' : 'No matches'}
+            description={workspaces.length === 0 ? 'No Claude Code workspaces were found on the server.' : 'Try a different search term.'}
+            action={workspaces.length === 0 ? { label: 'Refresh', onClick: handleRefresh } : undefined}
+          />
         ) : (
           <div className="divide-y divide-gray-800/50">
             {filtered.map((workspace) => (

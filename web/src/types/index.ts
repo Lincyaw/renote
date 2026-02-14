@@ -69,6 +69,7 @@ export interface ClaudeMessageMetadata {
 export interface WorkspaceInfo {
   dirName: string;
   displayPath: string;
+  fullPath: string;
   sessionCount: number;
   lastModified: number;
 }
@@ -130,6 +131,8 @@ export interface GitFileStatus {
   status: 'modified' | 'added' | 'deleted' | 'untracked' | 'renamed';
   staged: boolean;
   oldPath?: string;
+  additions?: number;
+  deletions?: number;
 }
 
 // === Toast ===

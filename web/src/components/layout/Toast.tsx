@@ -27,7 +27,7 @@ export default function Toast() {
         return (
           <div
             key={toast.id}
-            className={`${bgColor} text-white px-4 py-3 rounded-lg shadow-lg text-sm animate-slide-in cursor-pointer`}
+            className={`${bgColor} text-white px-4 py-3 rounded-lg shadow-lg text-sm animate-slide-in-right cursor-pointer`}
             onClick={() => removeToast(toast.id)}
           >
             {toast.message}
