@@ -362,9 +362,9 @@ export default function TerminalView({ sessionId }: TerminalViewProps) {
         <div ref={termRef} className="absolute inset-0 bg-[#0a0a0f]" />
       </div>
 
-      {/* Special keys toolbar - floats above virtual keyboard on mobile */}
+      {/* Special keys toolbar - floats above virtual keyboard on mobile/tablet */}
       <div
-        className="flex gap-1 p-1.5 bg-gray-900/95 backdrop-blur border-t border-gray-800 overflow-x-auto md:hidden z-50"
+        className="flex gap-1 p-1.5 bg-gray-900/95 backdrop-blur border-t border-gray-800 overflow-x-auto z-50"
         style={keyboardOpen
           ? { position: 'fixed', left: 0, right: 0, bottom: keyboardHeight }
           : undefined
