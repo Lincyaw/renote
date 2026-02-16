@@ -58,9 +58,11 @@ export default function TerminalView({ sessionId }: TerminalViewProps) {
   const fitAddonRef = useRef<FitAddon | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const lastSizeRef = useRef({ cols: 0, rows: 0 });
+  const pasteInputRef = useRef<HTMLTextAreaElement>(null);
   const [status, setStatus] = useState<'connecting' | 'connected' | 'error'>('connecting');
   const [ctrlActive, setCtrlActive] = useState(false);
   const ctrlActiveRef = useRef(false);
+  const [showPastePrompt, setShowPastePrompt] = useState(false);
   const keyboardHeight = useKeyboardHeight();
 
   const { connectionParams } = useConnectionStore();
@@ -241,6 +243,32 @@ export default function TerminalView({ sessionId }: TerminalViewProps) {
     term.focus();
   }, [ctrlActive]);
 
+  const handlePaste = useCallback(async () => {
+    const term = terminalRef.current;
+    const ws = wsRef.current;
+    const pasteInput = pasteInputRef.current;
+    if (!term || !ws || ws.readyState !== WebSocket.OPEN || !pasteInput) return;
+
+    try {
+      // Try modern clipboard API first
+      const text = await navigator.clipboard.readText();
+      if (text) {
+        ws.send(text);
+      }
+      term.focus();
+    } catch (err) {
+      console.error('Clipboard API failed, using fallback:', err);
+      // Safari/iOS fallback: show prompt and focus textarea
+      setShowPastePrompt(true);
+      pasteInput.value = '';
+      // Small delay to ensure the textarea is visible before focusing
+      setTimeout(() => {
+        pasteInput.focus();
+        pasteInput.select();
+      }, 100);
+    }
+  }, []);
+
   const keyboardOpen = keyboardHeight > 0;
 
   return (
@@ -252,6 +280,56 @@ export default function TerminalView({ sessionId }: TerminalViewProps) {
           {status === 'connecting' ? 'Connecting...' : 'Connection closed'}
         </div>
       )}
+
+      {/* Paste prompt for Safari/iOS */}
+      {showPastePrompt && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowPastePrompt(false);
+              terminalRef.current?.focus();
+            }
+          }}
+        >
+          <div className="bg-gray-800 text-white px-6 py-4 rounded-lg shadow-xl max-w-sm mx-4">
+            <div className="flex justify-between items-start mb-2">
+              <p className="text-sm">Tap in the box below and paste (long-press → Paste)</p>
+              <button
+                onClick={() => {
+                  setShowPastePrompt(false);
+                  terminalRef.current?.focus();
+                }}
+                className="ml-2 text-gray-400 hover:text-white text-xl leading-none"
+              >
+                ×
+              </button>
+            </div>
+            <div className="text-xs text-gray-400">Or press Cmd+V / Ctrl+V</div>
+          </div>
+        </div>
+      )}
+
+      {/* Textarea for Safari paste fallback */}
+      <textarea
+        ref={pasteInputRef}
+        onPaste={(e) => {
+          e.preventDefault();
+          const text = e.clipboardData?.getData('text');
+          const ws = wsRef.current;
+          const term = terminalRef.current;
+          if (text && ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(text);
+          }
+          setShowPastePrompt(false);
+          if (term) term.focus();
+        }}
+        placeholder="Tap and paste here..."
+        className={showPastePrompt
+          ? 'fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[60] w-64 h-32 p-3 bg-gray-900 text-white border-2 border-blue-500 rounded-lg focus:outline-none focus:border-blue-400'
+          : 'fixed left-[-9999px] w-[1px] h-[1px] opacity-0'
+        }
+      />
 
       {/* Stable container for ResizeObserver - size determined by flex, not by xterm */}
       <div ref={containerRef} className="flex-1 relative overflow-hidden">
@@ -283,6 +361,12 @@ export default function TerminalView({ sessionId }: TerminalViewProps) {
             {key.label}
           </button>
         ))}
+        <button
+          onClick={handlePaste}
+          className="px-2.5 py-1.5 text-xs font-mono rounded shrink-0 transition-colors bg-gray-800 text-gray-300 active:bg-gray-700"
+        >
+          PASTE
+        </button>
       </div>
     </div>
   );

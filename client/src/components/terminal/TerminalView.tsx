@@ -9,6 +9,7 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
+import Clipboard from '@react-native-clipboard/clipboard';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { WebView } from 'react-native-webview';
 import { useTerminalSessionStore, TerminalType } from '../../store/terminalSessionStore';
@@ -412,6 +413,19 @@ export default function TerminalView({ sessionId, onBack }: TerminalViewProps) {
     webViewRef.current?.injectJavaScript('window.focusTerminal && window.focusTerminal(); true;');
   }, [ctrlActive, altActive]);
 
+  const handlePaste = useCallback(async () => {
+    try {
+      const text = await Clipboard.getString();
+      if (text) {
+        const escaped = JSON.stringify(text);
+        webViewRef.current?.injectJavaScript(`window.writeToTerminal(${escaped}); true;`);
+        webViewRef.current?.injectJavaScript('window.focusTerminal && window.focusTerminal(); true;');
+      }
+    } catch (err) {
+      console.error('[TerminalView] Failed to paste from clipboard:', err);
+    }
+  }, []);
+
   useEffect(() => {
     return () => {
       webViewRef.current?.injectJavaScript('window.disconnect && window.disconnect(); true;');
@@ -546,6 +560,13 @@ export default function TerminalView({ sessionId, onBack }: TerminalViewProps) {
                 </Text>
               </TouchableOpacity>
             ))}
+            <TouchableOpacity
+              style={styles.toolbarKey}
+              onPress={handlePaste}
+              activeOpacity={0.6}
+            >
+              <Text style={styles.toolbarKeyText}>PASTE</Text>
+            </TouchableOpacity>
           </ScrollView>
         </View>
       </View>
