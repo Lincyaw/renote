@@ -63,6 +63,8 @@ export default function TerminalView({ sessionId }: TerminalViewProps) {
   const [status, setStatus] = useState<'connecting' | 'connected' | 'error'>('connecting');
   const [ctrlActive, setCtrlActive] = useState(false);
   const ctrlActiveRef = useRef(false);
+  const [scrollMode, setScrollMode] = useState(false);
+  const scrollModeRef = useRef(false);
   const [showPastePrompt, setShowPastePrompt] = useState(false);
   const keyboardHeight = useKeyboardHeight();
 
@@ -96,10 +98,14 @@ export default function TerminalView({ sessionId }: TerminalViewProps) {
     doFit();
   }, [keyboardHeight, doFit]);
 
-  // Keep ref in sync with state so onData closure can read latest value
+  // Keep refs in sync with state so closures can read latest values
   useEffect(() => {
     ctrlActiveRef.current = ctrlActive;
   }, [ctrlActive]);
+
+  useEffect(() => {
+    scrollModeRef.current = scrollMode;
+  }, [scrollMode]);
 
   useEffect(() => {
     if (!termRef.current || !containerRef.current || !connectionParams) return;
@@ -256,17 +262,33 @@ export default function TerminalView({ sessionId }: TerminalViewProps) {
     }
 
     if (key.send) {
+      const isArrowUpDown = key.send === '\x1b[A' || key.send === '\x1b[B';
+      const repeat = scrollModeRef.current && isArrowUpDown ? 3 : 1;
+
       if (ctrlActive && key.send.length === 1) {
         const code = key.send.toUpperCase().charCodeAt(0) - 64;
         ws.send(String.fromCharCode(code));
       } else {
-        ws.send(key.send);
+        for (let i = 0; i < repeat; i++) {
+          ws.send(key.send);
+        }
       }
     }
 
     if (ctrlActive) setCtrlActive(false);
     term.focus();
   }, [ctrlActive]);
+
+  const handleScrollToggle = useCallback(() => {
+    const ws = wsRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+
+    setScrollMode(prev => {
+      const next = !prev;
+      ws.send(next ? '\x13' : '\x1b'); // Ctrl+S enters Zellij scroll mode, Escape exits
+      return next;
+    });
+  }, []);
 
   const handlePaste = useCallback(async () => {
     const term = terminalRef.current;
@@ -386,6 +408,19 @@ export default function TerminalView({ sessionId }: TerminalViewProps) {
             {key.label}
           </button>
         ))}
+        <button
+          onPointerDown={(e) => {
+            e.preventDefault();
+            handleScrollToggle();
+          }}
+          className={`px-2.5 py-1.5 text-xs font-mono rounded shrink-0 transition-colors ${
+            scrollMode
+              ? 'bg-blue-600 text-white'
+              : 'bg-gray-800 text-gray-300 active:bg-gray-700'
+          }`}
+        >
+          SCROLL
+        </button>
         <button
           onClick={handlePaste}
           className="px-2.5 py-1.5 text-xs font-mono rounded shrink-0 transition-colors bg-gray-800 text-gray-300 active:bg-gray-700"
