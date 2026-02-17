@@ -276,7 +276,7 @@ export default function TerminalView({ sessionId }: TerminalViewProps) {
     }
 
     if (ctrlActive) setCtrlActive(false);
-    term.focus();
+    if (!scrollModeRef.current) term.focus();
   }, [ctrlActive]);
 
   const handleScrollToggle = useCallback(() => {
