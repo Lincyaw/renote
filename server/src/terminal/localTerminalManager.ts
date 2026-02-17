@@ -307,6 +307,12 @@ export class ZellijTerminalConnection {
     if (this.zellijAvailable) {
       // Create zellij session
       const zellijName = this.generateSessionName(sessionId, type);
+
+      // Check if this zellij session already exists before attaching
+      // (handles reconnect case where zellij session persists across WebSocket disconnects)
+      const existingSessions = listZellijSessions();
+      const isExistingSession = existingSessions.includes(zellijName);
+
       this.sessions.set(sessionId, {
         name: zellijName,
         type,
@@ -321,8 +327,8 @@ export class ZellijTerminalConnection {
         return false;
       }
 
-      // If claude type, run claude command inside zellij
-      if (type === 'claude') {
+      // If claude type and this is a NEW session (not a reconnect), run claude command
+      if (type === 'claude' && !isExistingSession) {
         setTimeout(() => {
           const claudePath = findCommand('claude') || 'claude';
           const args = options.claudeArgs?.join(' ') || '';
