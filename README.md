@@ -40,6 +40,8 @@ A mobile client for remote server development with Claude Code integration, simi
 
 - Node.js 18+
 - npm or yarn
+- [ripgrep](https://github.com/BurntSushi/ripgrep) (`rg`) - required for code search
+- [zellij](https://zellij.dev) - required for terminal session management (sessions persist across reconnects)
 - Java 17+ (for Android builds)
 - Android SDK (for Android builds)
 - React Native development environment (Xcode for iOS, Android Studio for Android)
@@ -66,7 +68,31 @@ npm run dev
 The server will start:
 - WebSocket server on port 9080 (configurable in .env)
 
-### 2. Start the Mobile Client
+### 2. Start the Web App
+
+```bash
+# Navigate to web directory
+cd web
+
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+```
+
+Open your browser at `http://localhost:5173` and connect to the server using your server's IP/hostname and port 9080.
+
+**Build for production (served by the Node.js server):**
+
+```bash
+# Build and copy dist into server/web-dist
+npm run build:deploy
+```
+
+After deploying, the server will serve the web app on the same port (9080) at `/`.
+
+### 3. Start the Mobile Client
 
 ```bash
 # Navigate to client directory
@@ -92,7 +118,7 @@ npm run ios
 npm run android
 ```
 
-### 3. Build Android APK
+### 4. Build Android APK
 
 ```bash
 cd client
@@ -151,6 +177,17 @@ npm run e2e:android
 
 ```
 renote/
+├── web/                       # React web app (Vite + Tailwind)
+│   ├── src/
+│   │   ├── App.tsx            # Root component
+│   │   ├── components/        # UI components (layout, sessions, files, terminal)
+│   │   ├── store/             # Zustand stores
+│   │   ├── services/          # Event emitter, WebSocket services
+│   │   └── types/             # TypeScript types
+│   ├── public/                # Static assets (PWA manifest, icons, service worker)
+│   ├── index.html
+│   └── package.json
+│
 ├── server/                    # Node.js WebSocket server
 │   ├── src/
 │   │   ├── index.ts          # Entry point
